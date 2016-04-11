@@ -7,6 +7,6 @@ This script queries all SCCM devices which have a Client Activity status listed 
 The script will generate a basic HTML report listing machine names and results:
 
 1. **Unpingable:** machine failed the "Test-Connection" cmdlet. Computer may be offline or no longer exists.
-2. WMI Error: The WMI command returned an error. May indicate a health issue with the computer
-3. Inactive After Checkin: The WMI command was initially successful, but a check again after 5 minutes shows that the Client Activity status is Inactive. May be a health issue with the client
-4. Success: WMI Command was issued successfully and the client now reports an active status.
+2. **WMI Error:** The WMI command returned an error. May indicate a health issue with the computer
+3. **Inactive After Checkin:** The WMI command was initially successful, but a check again after 5 minutes shows that the Client Activity status is Inactive. May be a health issue with the client
+4. **Success:** WMI Command was issued successfully and the client now reports an active status.
