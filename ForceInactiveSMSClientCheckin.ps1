@@ -13,7 +13,7 @@
     License: http://www.gnu.org/copyleft/gpl.html
 	Cmdlet Library: https://www.microsoft.com/en-us/download/details.aspx?id=46681
 .EXAMPLE 
-	ForceInactiveSMSClientCheckin -s "SiteCode" -to "reports@contoso.com" -from "reports@contoso.com" -smtp "mail.contoso.com"
+	ForceInactiveSMSClientCheckin -s "SiteCode" -srv "sms.contoso.com" -to "reports@contoso.com" -from "reports@contoso.com" -smtp "mail.contoso.com"
 
 #> 
 
@@ -31,6 +31,10 @@ Function ForceInactiveSMSClientCheckin
 		[string]$smsSiteCode,
 		
 		[parameter(Mandatory=$true)]
+		[alias("srv")]
+		[string]$smsSiteServer,
+		
+		[parameter(Mandatory=$true)]
 		[alias("To")]
 		[string]$emailRecipient,
 		
@@ -44,7 +48,7 @@ Function ForceInactiveSMSClientCheckin
 		
 		[parameter(Mandatory=$false)]
 		[alias("Subject")]
-		[string]$emailSubject="SMS Client Reportt",
+		[string]$emailSubject="SMS Client Report",
 		
 		[parameter(Mandatory=$false)]
 		[alias("body")]
@@ -53,6 +57,12 @@ Function ForceInactiveSMSClientCheckin
 	
 	#variable init
 	$smsPathLocation = "$smsSiteCode" + ":\" #name os PSDrive to set location to to issue SCCM cmdlets
+	#if the PSdrive does not exist with the sitecode, create it (this may occur if the script is running as NT Authority\System)
+	If(!(Get-PSDrive | where {$_.Name -eq $smsSiteCode}))
+	{
+		New-PSDrive -Name $smsSiteCode -PSProvider "CMSite" -root $smsSiteServer
+	}
+	
 	Set-Location $smsPathLocation #set location of SMS Site
 	[string]$dateStamp = Get-Date -UFormat "%Y%m%d_%H%M%S" #timestamp for naming report
 	$tempFolder = get-item env:temp #temp folder
