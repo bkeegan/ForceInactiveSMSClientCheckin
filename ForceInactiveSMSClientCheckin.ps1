@@ -55,7 +55,6 @@ Function ForceInactiveSMSClientCheckin
 	Set-Location $smsPathLocation
 	[string]$dateStamp = Get-Date -UFormat "%Y%m%d_%H%M%S"
 	$tempFolder = get-item env:temp
-
 	$sccmCheckinResults = new-object 'system.collections.generic.dictionary[string,string]'	
 
 	$inactiveDevices = Get-CMDevice | where {$_.ClientActiveStatus -eq 0 -and $_.ClientType -eq 1} | Select Name
@@ -103,10 +102,8 @@ Function ForceInactiveSMSClientCheckin
 				$sccmCheckinResults.Add($sccmResult.Key,"Inactive After Checkin")
 			}
 		}
-	
 	}
 	
-
 	$sccmCheckinResults.GetEnumerator() | Sort-Object -property Value | ConvertTo-HTML | Out-File "$($tempFolder.value)\$dateStamp-SCCMClientReport.html"
 	Send-MailMessage -To $emailRecipient -Subject $emailSubject -smtpServer $emailServer -From $emailSender -body $emailBody -Attachments "$($tempFolder.value)\$dateStamp-SCCMClientReport.html"
 }
