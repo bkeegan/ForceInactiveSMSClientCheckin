@@ -51,59 +51,64 @@ Function ForceInactiveSMSClientCheckin
 		[string]$emailBody="SMS Client Report - See Attachment"
 	)
 	
-	$smsPathLocation = "$smsSiteCode" + ":\"
-	Set-Location $smsPathLocation
-	[string]$dateStamp = Get-Date -UFormat "%Y%m%d_%H%M%S"
-	$tempFolder = get-item env:temp
-	$sccmCheckinResults = new-object 'system.collections.generic.dictionary[string,string]'	
+	#variable init
+	$smsPathLocation = "$smsSiteCode" + ":\" #name os PSDrive to set location to to issue SCCM cmdlets
+	Set-Location $smsPathLocation #set location of SMS Site
+	[string]$dateStamp = Get-Date -UFormat "%Y%m%d_%H%M%S" #timestamp for naming report
+	$tempFolder = get-item env:temp #temp folder
+	$successfulComputers = @() #store list of successfully updates computers - used to recheck after
+	$sccmCheckinResults = new-object 'system.collections.generic.dictionary[string,string]'	#dictionary object to store results
 
+	#get sccm devices which have "Inactive" for "ClientActivity". Only selects Windows clients (ClientType = 1)
 	$inactiveDevices = Get-CMDevice | where {$_.ClientActiveStatus -eq 0 -and $_.ClientType -eq 1} | Select Name
 	Foreach ($inactiveDevice in $inactiveDevices)
 	{
 		$computerName = $inactiveDevice.Name
-		$errorAction 
 		If(Test-Connection $computerName -ErrorAction SilentlyContinue)
 		{
 			$success = $true
 			Try
 			{
+				#attempt to connect to SMS WMI and issue RequestMachinePolicy command
 				$wmiPath = "\\" + $computerName + "\root\ccm:SMS_Client"
 				$smsWMI = [wmiclass] $wmiPath 
 				[void]$smsWMI.RequestMachinePolicy()
 			}
 			Catch
 			{
+				#if above produces an error, logged in dictionary object here.
 				$success = $false
 				$sccmCheckinResults.Add($computerName,"WMI Error")
 			}
 			if($success)
 			{
+				#if successful, logged to dictionary object, also store name in array to check again after complete
+				$successfulComputers += $computerName
 				$sccmCheckinResults.Add($computerName,"Success")
 			}
 		}
 		else
 		{
+			#record unpingable computers
 			$sccmCheckinResults.Add($computerName,"Unpingable")
 		}
 	}
 	
-	#wait 5 minutes before re-check
+	#wait 5 minutes before re-check. Assume endpoint clients need a few minutes to become flagged as active after issuing a manual check. 
 	sleep 300
-	
-	$sccmResults = $sccmCheckinResults.GetEnumerator()
-	foreach($sccmResult in $sccmResults)
+	#check computers that successfully executed a Machine Policy Retrieval. If still flagged as inactive after 5 minutes there may be a problem with the SCCM client.
+	foreach($successfulComputer in $successfulComputers)
 	{
-		if($sccmResult.Value -eq "Success")
+		$sccmDevice = Get-CMDevice -name $successfulComputer
+		if($sccmDevice.ClientActiveStatus -eq 0)
 		{
-			$sccmDevice = Get-CMDevice -name $sccmResult.Key
-			if($sccmDevice.ClientActiveStatus -eq 0)
-			{
-				$sccmCheckinResults.Remove($sccmResult.Key)
-				$sccmCheckinResults.Add($sccmResult.Key,"Inactive After Checkin")
-			}
+			$sccmCheckinResults.Remove($successfulComputer)
+			$sccmCheckinResults.Add($successfulComputer,"Inactive After Checkin")
 		}
 	}
 	
+	#generate HTML Report
 	$sccmCheckinResults.GetEnumerator() | Sort-Object -property Value | ConvertTo-HTML | Out-File "$($tempFolder.value)\$dateStamp-SCCMClientReport.html"
+	#send email to specified recipient and attach HTML report
 	Send-MailMessage -To $emailRecipient -Subject $emailSubject -smtpServer $emailServer -From $emailSender -body $emailBody -Attachments "$($tempFolder.value)\$dateStamp-SCCMClientReport.html"
 }
