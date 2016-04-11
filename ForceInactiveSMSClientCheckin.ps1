@@ -87,6 +87,25 @@ Function ForceInactiveSMSClientCheckin
 			$sccmCheckinResults.Add($computerName,"Unpingable")
 		}
 	}
+	
+	#wait 5 minutes before re-check
+	sleep 300
+	
+	$sccmResults = $sccmCheckinResults.GetEnumerator()
+	foreach($sccmResult in $sccmResults)
+	{
+		if($sccmResult.Value -eq "Success")
+		{
+			$sccmDevice = Get-CMDevice -name $sccmResult.Key
+			if($sccmDevice.ClientActiveStatus -eq 0)
+			{
+				$sccmCheckinResults.Remove($sccmResult.Key)
+				$sccmCheckinResults.Add($sccmResult.Key,"Inactive After Checkin")
+			}
+		}
+	
+	}
+	
 
 	$sccmCheckinResults.GetEnumerator() | Sort-Object -property Value | ConvertTo-HTML | Out-File "$($tempFolder.value)\$dateStamp-SCCMClientReport.html"
 	Send-MailMessage -To $emailRecipient -Subject $emailSubject -smtpServer $emailServer -From $emailSender -body $emailBody -Attachments "$($tempFolder.value)\$dateStamp-SCCMClientReport.html"
